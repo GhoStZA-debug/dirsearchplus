@@ -1,21 +1,3 @@
-# -*- coding: utf-8 -*-
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
-#
-#  Author: Mauro Soria
-
 import sys
 
 from lib.core.settings import (
@@ -33,6 +15,7 @@ from lib.utils.file import File, FileUtils
 
 
 def parse_options():
+    """解析命令行选项并进行初始化配置"""
     open("bypass403_url.txt", 'w').close()
     opt = parse_config(parse_arguments())
 
@@ -41,6 +24,7 @@ def parse_options():
 
     opt.http_method = opt.http_method.upper()
 
+    # 设置 URLs 来源：从文件读取、CIDR 地址段、标准输入或原始请求文件
     if opt.url_file:
         fd = _access_file(opt.url_file)
         opt.urls = fd.get_lines()
@@ -51,7 +35,7 @@ def parse_options():
     elif opt.raw_file:
         _access_file(opt.raw_file)
     elif not opt.urls:
-        print("URL target is missing, try using -u <url>")
+        print("缺少URL目标，请尝试使用 -u <url>")
         #opt.urls="http://www.baidu.com"
         exit(1)
     bypass403_url="".join(opt.urls)
@@ -62,32 +46,39 @@ def parse_options():
     if not opt.raw_file:
         opt.urls = uniq(opt.urls)
 
+    # 检查是否指定了扩展名
     if not opt.extensions and not opt.remove_extensions:
-        print("WARNING: No extension was specified!")
+        print("警告：未指定扩展名！")
 
+    # 必须提供至少一个字典文件
     if not opt.wordlists:
-        print("No wordlist was provided, try using -w <wordlist>")
+        print("未提供字典文件，请尝试使用 -w <字典文件>")
         exit(1)
 
     opt.wordlists = tuple(wordlist.strip() for wordlist in opt.wordlists.split(","))
 
+    # 检查每个字典文件是否存在且可读
     for dict_file in opt.wordlists:
         _access_file(dict_file)
 
+    # 线程数量必须大于零
     if opt.thread_count < 1:
-        print("Threads number must be greater than zero")
+        print("线程数必须大于零")
         exit(1)
 
+    # 设置代理服务器
     if opt.tor:
         opt.proxies = list(DEFAULT_TOR_PROXIES)
     elif opt.proxy_file:
         fd = _access_file(opt.proxy_file)
         opt.proxies = fd.get_lines()
 
+    # 数据文件处理
     if opt.data_file:
         fd = _access_file(opt.data_file)
         opt.data = fd.get_lines()
 
+    # SSL/TLS 认证相关文件检查
     if opt.cert_file:
         _access_file(opt.cert_file)
 
@@ -96,29 +87,36 @@ def parse_options():
 
     headers = {}
 
+    # 请求头文件处理
     if opt.header_file:
         try:
             fd = _access_file(opt.header_file)
             headers.update(dict(HeadersParser(fd.read())))
         except Exception as e:
-            print("Error in headers file: " + str(e))
+            print("请求头文件错误: " + str(e))
             exit(1)
 
+    # 命令行传入的请求头处理
     if opt.headers:
         try:
             headers.update(dict(HeadersParser("\n".join(opt.headers))))
         except Exception:
-            print("Invalid headers")
+            print("无效的请求头")
             exit(1)
 
     opt.headers = headers
 
+    # 解析各种状态码过滤条件
     opt.include_status_codes = _parse_status_codes(opt.include_status_codes)
     opt.exclude_status_codes = _parse_status_codes(opt.exclude_status_codes)
     opt.recursion_status_codes = _parse_status_codes(opt.recursion_status_codes)
     opt.skip_on_status = _parse_status_codes(opt.skip_on_status)
+
+    # 处理前缀与后缀
     opt.prefixes = uniq([prefix.strip() for prefix in opt.prefixes.split(",") if prefix], tuple)
     opt.suffixes = uniq([suffix.strip() for suffix in opt.suffixes.split(",") if suffix], tuple)
+
+    # 子目录路径处理
     opt.subdirs = [
         subdir.lstrip(" /") + ("" if not subdir or subdir.endswith("/") else "/")
         for subdir in opt.subdirs.split(",")
@@ -127,15 +125,17 @@ def parse_options():
         subdir.lstrip(" /") + ("" if not subdir or subdir.endswith("/") else "/")
         for subdir in opt.exclude_subdirs.split(",")
     ]
+
+    # 排除大小处理
     opt.exclude_sizes = {size.strip().upper() for size in opt.exclude_sizes.split(",")}
 
+    # 扩展名处理逻辑
     if opt.remove_extensions:
         opt.extensions = ("",)
     elif opt.extensions == "*":
         opt.extensions = COMMON_EXTENSIONS
     elif opt.extensions == "CHANGELOG.md":
-        print("A weird extension was provided: 'CHANGELOG.md'. Please do not use * as the "
-              "extension or enclose it in double quotes")
+        print("提供了奇怪的扩展名: 'CHANGELOG.md'。请不要使用 * 作为扩展名或将其用双引号括起来")
         exit(0)
     else:
         opt.extensions = uniq(
@@ -143,6 +143,7 @@ def parse_options():
             tuple,
         )
 
+    # 排除扩展名处理
     opt.exclude_extensions = uniq(
         [
             exclude_extension.lstrip(" .")
@@ -150,24 +151,25 @@ def parse_options():
         ], tuple
     )
 
+    # 认证类型验证
     if opt.auth and not opt.auth_type:
-        print("Please select the authentication type with --auth-type")
+        print("请选择认证类型 --auth-type")
         exit(1)
     elif opt.auth_type and not opt.auth:
-        print("No authentication credential found")
+        print("未找到认证凭据")
         exit(1)
     elif opt.auth and opt.auth_type not in AUTHENTICATION_TYPES:
-        print(f"'{opt.auth_type}' is not in available authentication "
-              f"types: {', '.join(AUTHENTICATION_TYPES)}")
+        print(f"'{opt.auth_type}' 不在可用的认证类型中: {', '.join(AUTHENTICATION_TYPES)}")
         exit(1)
 
+    # 扩展名冲突检测
     if set(opt.extensions).intersection(opt.exclude_extensions):
-        print("Exclude extension list can not contain any extension "
-              "that has already in the extension list")
+        print("排除扩展名列表不能包含已在扩展名列表中的任何扩展名")
         exit(1)
 
+    # 输出格式校验
     if opt.output_format not in OUTPUT_FORMATS:
-        print("Select one of the following output formats: "
+        print("请选择以下输出格式之一: "
               f"{', '.join(OUTPUT_FORMATS)}")
         exit(1)
 
@@ -175,6 +177,15 @@ def parse_options():
 
 
 def _parse_status_codes(str_):
+    """
+    将字符串形式的状态码转换为整型集合
+
+    参数:
+        str_ (str): 状态码字符串，支持单个数字或范围如 "200,400-404"
+
+    返回值:
+        set[int]: 解析后的状态码集合
+    """
     if not str_:
         return set()
 
@@ -188,34 +199,52 @@ def _parse_status_codes(str_):
             else:
                 status_codes.add(int(status_code.strip()))
         except ValueError:
-            print(f"Invalid status code or status code range: {status_code}")
+            print(f"无效的状态码或状态码范围: {status_code}")
             exit(1)
 
     return status_codes
 
 
 def _access_file(path):
+    """
+    检查指定路径的文件是否存在、是普通文件并且可以被读取
+
+    参数:
+        path (str): 文件路径
+
+    返回值:
+        File: 可操作的 File 对象实例
+    """
     with File(path) as fd:
         if not fd.exists():
-            print(f"{path} does not exist")
+            print(f"{path} 不存在")
             exit(1)
 
         if not fd.is_valid():
-            print(f"{path} is not a file")
+            print(f"{path} 不是一个文件")
             exit(1)
 
         if not fd.can_read():
-            print(f"{path} cannot be read")
+            print(f"{path} 无法读取")
             exit(1)
 
         return fd
 
 
 def parse_config(opt):
+    """
+    使用配置文件中的默认值填充未在命令行中提供的选项
+
+    参数:
+        opt (argparse.Namespace): 已经通过命令行解析得到的对象
+
+    返回值:
+        argparse.Namespace: 合并了配置文件和命令行参数的结果对象
+    """
     config = ConfigParser()
     config.read(opt.config)
 
-    # General
+    # 通用设置
     opt.thread_count = opt.thread_count or config.safe_getint(
         "general", "threads", 25
     )
@@ -259,7 +288,7 @@ def parse_config(opt):
         "general", "exit-on-error"
     )
 
-    # Dictionary
+    # 字典设置
     opt.wordlists = opt.wordlists or config.safe_get(
         "dictionary",
         "wordlists",
@@ -285,7 +314,7 @@ def parse_config(opt):
         "dictionary", "capitalization"
     )
 
-    # Request
+    # 请求设置
     opt.http_method = opt.http_method or config.safe_get("request", "http-method", "get")
     opt.header_file = opt.header_file or config.safe_get("request", "headers-file")
     opt.follow_redirects = opt.follow_redirects or config.safe_getboolean(
@@ -297,9 +326,9 @@ def parse_config(opt):
     opt.user_agent = opt.user_agent or config.safe_get("request", "user-agent")
     opt.cookie = opt.cookie or config.safe_get("request", "cookie")
 
-    # Connection
+    # 连接设置
     opt.delay = opt.delay or config.safe_getfloat("connection", "delay")
-    opt.timeout = opt.timeout or config.safe_getfloat("connection", "timeout", 15)  # Increased from 7.5 to 15 seconds for better SOCKS4a compatibility
+    opt.timeout = opt.timeout or config.safe_getfloat("connection", "timeout", 15)  # 从7.5秒增加到15秒以更好地兼容SOCKS4a
     opt.max_retries = opt.max_retries or config.safe_getint("connection", "max-retries", 1)
     opt.max_rate = opt.max_rate or config.safe_getint("connection", "max-rate")
     opt.proxies = opt.proxies or list(config.safe_get("connection", "proxy", []))
@@ -309,10 +338,10 @@ def parse_config(opt):
     )
     opt.replay_proxy = opt.replay_proxy or config.safe_get("connection", "replay-proxy")
 
-    # Advanced
+    # 高级设置
     opt.crawl = opt.crawl or config.safe_getboolean("advanced", "crawl")
 
-    # View
+    # 显示设置
     opt.full_url = opt.full_url or config.safe_getboolean("view", "full-url")
     opt.color = opt.color or config.safe_getboolean("view", "color", True)
     opt.quiet = opt.quiet or config.safe_getboolean("view", "quiet-mode")
@@ -320,7 +349,7 @@ def parse_config(opt):
         "view", "show-redirects-history"
     )
 
-    # Output
+    # 输出设置
     opt.output_path = config.safe_get("output", "autosave-report-folder")
     opt.autosave_report = config.safe_getboolean("output", "autosave-report")
     opt.log_file_size = config.safe_getint("output", "log-file-size")
