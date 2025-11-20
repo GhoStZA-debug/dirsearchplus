@@ -353,12 +353,18 @@ def packer_fuzzer():
 
                 # 检查是否已经安装了 Packer-Fuzzer
                 # 更新路径为 script/Packer-Fuzzer
-                if not os.path.exists(os.path.join(os.getcwd(), 'script', 'Packer-Fuzzer')):
+                packer_fuzzer_base_dir = os.path.join(os.getcwd(), 'script')
+                packer_fuzzer_dir = os.path.join(packer_fuzzer_base_dir, 'Packer-Fuzzer')
+
+                if not os.path.exists(packer_fuzzer_dir):
                     print(Fore.YELLOW + "未找到Packer-Fuzzer。正在从GitHub克隆..." + Style.RESET_ALL)
+                    # 确保 script 目录存在
+                    if not os.path.exists(packer_fuzzer_base_dir):
+                        os.makedirs(packer_fuzzer_base_dir)
                     # 克隆 Packer-Fuzzer 仓库到 script 目录
                     subprocess.run([
                         'git', 'clone', 'https://github.com/rtcatc/Packer-Fuzzer.git'
-                    ], cwd=os.path.join(os.getcwd(), 'script'), check=True)
+                    ], cwd=packer_fuzzer_base_dir, check=True)
 
                 # 使用项目根目录下的.venv虚拟环境
                 project_root = os.getcwd()
@@ -375,9 +381,15 @@ def packer_fuzzer():
                     print(Fore.RED + "项目虚拟环境(.venv)不存在，请先创建项目虚拟环境" + Style.RESET_ALL)
                     return
 
+                # 确保 Packer-Fuzzer 的报告目录存在
+                reports_dir = os.path.join(packer_fuzzer_dir, 'reports')
+                res_dir = os.path.join(reports_dir, 'res')
+                if not os.path.exists(reports_dir):
+                    os.makedirs(reports_dir)
+                if not os.path.exists(res_dir):
+                    os.makedirs(res_dir)
+
                 # 优化依赖检查逻辑 - 只在必要时安装依赖
-                # 更新 Packer-Fuzzer 路径为 script/Packer-Fuzzer
-                packer_fuzzer_dir = os.path.join(project_root, 'script', 'Packer-Fuzzer')
                 requirements_file = os.path.join(packer_fuzzer_dir, 'requirements.txt')
                 installed_flag = os.path.join(packer_fuzzer_dir, '.installed')
 
@@ -395,7 +407,7 @@ def packer_fuzzer():
                     print(Fore.GREEN + "正在项目虚拟环境中安装Packer-Fuzzer依赖..." + Style.RESET_ALL)
                     # 使用项目根目录下的虚拟环境pip来安装Packer-Fuzzer目录中的requirements.txt
                     subprocess.run([
-                        venv_pip, 'install', '-r', os.path.join(project_root, 'script', 'Packer-Fuzzer', 'requirements.txt')
+                        venv_pip, 'install', '-r', os.path.join(packer_fuzzer_dir, 'requirements.txt')
                     ], cwd=project_root, check=True)
 
                     # 创建或更新标记文件
@@ -406,7 +418,7 @@ def packer_fuzzer():
 
                 # 设置环境变量以解决编码问题
                 env = os.environ.copy()
-                env['NONCOMPREHENDING'] = 'utf-8'
+                env['PYTHONIOENCODING'] = 'utf-8'
                 if sys.platform == "win32":
                     env['PYTHONLEGACYWINDOWSFSENCODING'] = '1'
 
@@ -414,14 +426,14 @@ def packer_fuzzer():
                 print(Fore.GREEN + "正在运行Packer-Fuzzer扫描..." + Style.RESET_ALL)
                 result = subprocess.run([
                     venv_python, 'PackerFuzzer.py', '-u', url
-                ], cwd=os.path.join(project_root, 'script', 'Packer-Fuzzer'),  # 更新工作目录
+                ], cwd=packer_fuzzer_dir,  # 使用完整的 Packer-Fuzzer 目录路径
                    capture_output=True, text=True, env=env,
-                   errors='replace')  # 添加 errors 参数来处理编码问题
+                   errors='replace', encoding='utf-8')  # 添加 encoding='utf-8' 参数
 
                 # 查找生成的HTML报告
                 import glob
                 # 更新报告路径为 script/Packer-Fuzzer/reports
-                report_files = glob.glob(os.path.join(project_root, 'script', 'Packer-Fuzzer', 'reports', '*.html'))
+                report_files = glob.glob(os.path.join(packer_fuzzer_dir, 'reports', '*.html'))
                 if report_files:
                     latest_report = max(report_files, key=os.path.getctime)
                     print(Fore.GREEN + "\nPacker-Fuzzer扫描报告已找到:" + Style.RESET_ALL)
@@ -445,6 +457,7 @@ def packer_fuzzer():
             print(Fore.RED + "未找到bypass403_url.txt" + Style.RESET_ALL)
     except Exception as e:
         print(Fore.RED + f"Packer-Fuzzer扫描期间出错: {str(e)}" + Style.RESET_ALL)
+
 
 
 def run():
