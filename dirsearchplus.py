@@ -14,6 +14,7 @@
 #  MA 02110-1301, USA.
 #
 #  作者: Mauro Soria
+import re
 
 from colorama import init, Fore, Style
 
