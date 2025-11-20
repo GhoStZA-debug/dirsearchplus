@@ -1,12 +1,13 @@
 # !/usr/bin/env python3
 # -*- encoding: utf-8 -*-
+import signal
+import sys
 
 from lib.Controller import Project
 from lib.TestProxy import testProxy
-from lib.common.banner import RandomBanner
 from lib.common.cmdline import CommandLines
-from lib.common.readConfig import ReadConfig
-import signal
+
+
 # 处理SIGINT信号 (CTRL+C)
 def signal_handler(sig, frame):
     print('\n[!] 检测到中断信号，正在退出程序...')
@@ -14,7 +15,7 @@ def signal_handler(sig, frame):
 
 signal.signal(signal.SIGINT, signal_handler)
 
-class Program():
+class Program:
     def __init__(self,options):
         self.options = options
 
