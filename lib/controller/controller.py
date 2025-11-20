@@ -1,21 +1,3 @@
-# -*- coding: utf-8 -*-
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
-#
-#  Author: Mauro Soria
-
 import os
 import gc
 import time
@@ -68,7 +50,18 @@ from lib.view.terminal import output
 
 
 class Controller:
+    """
+    控制器类，用于管理整个扫描流程。
+
+    负责初始化配置、处理会话恢复与保存、设置请求对象和字典、运行扫描任务等核心功能。
+    """
+
     def __init__(self):
+        """
+        初始化控制器实例。
+
+        根据是否提供会话文件决定是从旧会话加载还是进行全新设置，并启动主运行循环。
+        """
         if options["session_file"]:
             self._import(options["session_file"])
             self.old_session = True
@@ -79,6 +72,15 @@ class Controller:
         self.run()
 
     def _import(self, session_file):
+        """
+        从指定的会话文件中导入之前的状态信息。
+
+        参数:
+            session_file (str): 会话文件路径
+
+        异常:
+            UnpicklingError: 当会话文件格式无效或版本过旧时抛出
+        """
         try:
             with open(session_file, "rb") as fd:
                 indict, last_output, opt = unpickle(fd)
@@ -93,6 +95,12 @@ class Controller:
         print(last_output)
 
     def _export(self, session_file):
+        """
+        将当前状态导出到会话文件以供后续恢复使用。
+
+        参数:
+            session_file (str): 目标会话文件路径
+        """
         # Save written output
         last_output = output.buffer.rstrip()
 
@@ -103,6 +111,11 @@ class Controller:
             pickle((vars(self), last_output, options), fd)
 
     def setup(self):
+        """
+        设置初始环境变量及组件。
+
+        包括黑名单更新、原始请求解析（如适用）、请求头设定、认证信息配置、日志记录启用、报告目录创建等。
+        """
         blacklists.update(get_blacklists())
 
         if options["raw_file"]:
@@ -185,6 +198,11 @@ class Controller:
             output.log_file(options["log_file"])
 
     def run(self):
+        """
+        主执行循环，依次处理所有目标URL。
+
+        每个目标都会被分配一个Fuzzer实例来执行实际的探测工作。根据不同的异常类型采取相应的错误处理策略。
+        """
         # match_callbacks and not_found_callbacks callback values:
         #  - *args[0]: lib.connection.Response() object
         #
@@ -248,6 +266,11 @@ class Controller:
                 output.error("Failed to delete old session file, remove it to free some space")
 
     def start(self):
+        """
+        开始对当前目标的所有目录进行扫描。
+
+        循环遍历待扫描目录列表，每次调用Fuzzer开始一次新的扫描过程并处理结果。
+        """
         while self.directories:
             try:
                 gc.collect()
@@ -275,6 +298,14 @@ class Controller:
                 self.old_session = False
 
     def set_target(self, url):
+        """
+        解析并设置当前要扫描的目标URL。
+
+        处理协议识别、端口默认值填充、凭据提取以及DNS缓存等功能。
+
+        参数:
+            url (str): 用户输入的目标地址字符串
+        """
         # If no scheme specified, unset it first
         if "://" not in url:
             url = f'{options["scheme"] or UNKNOWN}://{url}'
@@ -332,6 +363,12 @@ class Controller:
         self.requester.set_url(self.url)
 
     def setup_batch_reports(self):
+        """
+        创建批量报告存储目录。
+
+        返回:
+            str: 新建的批处理报告目录绝对路径
+        """
         """Create batch report folder"""
 
         self.batch = True
@@ -348,12 +385,23 @@ class Controller:
         return batch_directory_path
 
     def get_output_extension(self):
+        """
+        获取输出文件扩展名。
+
+        返回:
+            str: 对应于所选输出格式的文件后缀
+        """
         if options["output_format"] in ("plain", "simple"):
             return "txt"
 
         return {options["output_format"]}
 
     def setup_reports(self):
+        """
+        配置报告文件路径及相关属性。
+
+        若启用了自动保存且未手动指定输出文件，则自动生成唯一命名规则下的报告文件路径。
+        """
         """Create report file"""
 
         output_file = options["output_file"]
@@ -421,16 +469,30 @@ class Controller:
         output.output_file(output_file)
 
     def reset_consecutive_errors(self, response):
+        """
+        重置连续错误计数器。
+
+        参数:
+            response: 响应对象（虽然未直接使用但符合回调接口要求）
+        """
         self.consecutive_errors = 0
 
     def match_callback(self, response):
+        """
+        成功匹配响应后的回调函数。
+
+        执行包括跳过特定状态码检查、输出状态报告、递归扫描子路径、重放代理请求以及将结果写入报告等操作。
+
+        参数:
+            response: 接收到的有效HTTP响应对象
+        """
         if response.status in options["skip_on_status"]:
             raise SkipTargetInterrupt(
                 f"Skipped the target due to {response.status} status code"
             )
 
         output.status_report(response, options["full_url"])
-        
+
         # 如果状态码是403，写入到403list.txt文件
         if response.status == 403:
             try:
@@ -467,6 +529,14 @@ class Controller:
             self.report.save(self.results)
 
     def update_progress_bar(self, response):
+        """
+        更新进度条显示信息。
+
+        计算已完成/剩余的工作量比例，并刷新终端界面中的进度展示。
+
+        参数:
+            response: HTTP响应对象（仅作为回调参数传递）
+        """
         jobs_count = (
             # Jobs left for unscanned targets
             len(options["subdirs"]) * (len(self.targets) - 1)
@@ -486,6 +556,14 @@ class Controller:
         )
 
     def raise_error(self, exception):
+        """
+        错误发生时触发的回调方法。
+
+        判断是否需要立即退出程序；否则增加错误计数并在超过阈值时中断当前目标扫描。
+
+        参数:
+            exception: 发生的具体异常对象
+        """
         if options["exit_on_error"]:
             raise QuitInterrupt("Canceled due to an error")
 
@@ -496,9 +574,20 @@ class Controller:
             raise SkipTargetInterrupt("Too many request errors")
 
     def append_error_log(self, exception):
+        """
+        将发生的异常详细信息追加至日志系统。
+
+        参数:
+            exception: 异常对象，其traceback会被记录下来
+        """
         logger.exception(exception)
 
     def handle_pause(self):
+        """
+        处理用户按下Ctrl+C暂停命令的情况。
+
+        提供交互式菜单让用户选择继续、跳转下一个目录、切换目标或退出程序。
+        """
         output.warning(
             "CTRL+C detected: Pausing threads, please wait...", do_save=False
         )
@@ -556,9 +645,20 @@ class Controller:
                 raise SkipTargetInterrupt("Target skipped by the user")
 
     def is_timed_out(self):
+        """
+        检查是否已超出最大允许运行时间限制。
+
+        返回:
+            bool: 是否超时标志位
+        """
         return time.time() - self.start_time > options["max_time"] > 0
 
     def process(self):
+        """
+        等待当前Fuzzer完成一轮扫描周期。
+
+        在等待期间持续检测是否达到超时条件或接收到键盘中断信号。
+        """
         while True:
             try:
                 while not self.fuzzer.wait(0.25):
@@ -573,6 +673,12 @@ class Controller:
                 self.handle_pause()
 
     def add_directory(self, path):
+        """
+        添加一个新的目录路径进入递归扫描队列。
+
+        参数:
+            path (str): 待加入的相对路径字符串
+        """
         """Add directory to the recursion queue"""
 
         # Pass if path is in exclusive directories
@@ -594,6 +700,15 @@ class Controller:
 
     @locked
     def recur(self, path):
+        """
+        根据递归选项决定如何展开给定路径。
+
+        参数:
+            path (str): 当前发现的路径
+
+        返回:
+            list[str]: 新增进队列的目录路径集合
+        """
         dirs_count = len(self.directories)
         path = clean_path(path)
 
@@ -616,6 +731,16 @@ class Controller:
         return self.directories[dirs_count:]
 
     def recur_for_redirect(self, path, redirect_path):
+        """
+        特殊情况下针对重定向路径执行递归逻辑。
+
+        参数:
+            path (str): 原始访问路径
+            redirect_path (str): 实际跳转到的新路径
+
+        返回:
+            list[str]: 若满足条件则返回新增路径列表，否则为空数组
+        """
         if redirect_path == path + "/":
             return self.recur(redirect_path)
 
