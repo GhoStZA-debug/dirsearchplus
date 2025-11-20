@@ -2,9 +2,10 @@
 # -*- encoding: utf-8 -*-
 
 import random
-from lib.common.utils import Utils
-from lib.common.cmdline import CommandLines
-
+# from lib.common.utils import Utils
+from .utils import Utils
+# from lib.common.cmdline import CommandLines
+from .cmdline import CommandLines
 
 Version = 'Packer Fuzzer v1.4.15'
 red = '\033[25;31m'
@@ -69,7 +70,7 @@ Banner7 = ""
 
 def RandomBanner():
     # BannerList = [Banner1,Banner2,Banner3,Banner7]
-    if CommandLines().cmd().silent == None:
+    if CommandLines().cmd().silent is None:
         print(Banner7)
         print(Utils().getMyWord("{xhlj}") + "\n")
 
