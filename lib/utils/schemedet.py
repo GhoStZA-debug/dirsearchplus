@@ -1,21 +1,3 @@
-# -*- coding: utf-8 -*-
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
-#
-#  Author: Mauro Soria
-
 import ssl
 import socket
 
@@ -23,16 +5,28 @@ from lib.core.settings import SOCKET_TIMEOUT
 
 
 def detect_scheme(host, port):
+    """
+    检测指定主机和端口使用的协议是HTTP还是HTTPS
+
+    :param host: 主机名或IP地址
+    :param port: 端口号
+    :return: "https" 如果支持SSL连接，否则返回"http"
+    :raises ValueError: 当端口为空时抛出异常
+    """
     if not port:
         raise ValueError
 
+    # 创建socket连接并设置超时时间
     s = socket.socket()
     s.settimeout(SOCKET_TIMEOUT)
     conn = ssl.SSLContext().wrap_socket(s)
 
     try:
+        # 尝试建立SSL连接来检测是否支持HTTPS
         conn.connect((host, port))
         conn.close()
         return "https"
     except Exception:
+        # SSL连接失败，返回HTTP协议
         return "http"
+
