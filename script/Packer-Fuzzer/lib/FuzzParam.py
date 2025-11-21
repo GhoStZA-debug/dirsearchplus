@@ -12,15 +12,32 @@ from lib.common.CreatLog import creatLog
 
 
 class FuzzerParam():
+    """
+    模糊测试参数处理类
 
-    def creatAlpha(self,num):
+    用于收集API中的参数信息，并生成模糊测试所需的配置模板。
+    """
+
+    def creatAlpha(self, num):
+        """
+        生成指定长度的随机字母字符串
+
+        :param num: 需要生成的字符串长度
+        :return: 随机字母组成的字符串
+        """
         H = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
         salt = ''
         for i in range(num):
             salt += random.choice(H)
         return salt
 
-    def creatNum(self,num):
+    def creatNum(self, num):
+        """
+        生成指定长度的随机数字字符串
+
+        :param num: 需要生成的字符串长度
+        :return: 随机数字组成的字符串
+        """
         H = '0123456789'
         salt = ''
         for i in range(num):
@@ -28,12 +45,24 @@ class FuzzerParam():
         return salt
 
     def __init__(self, projectTag):
+        """
+        初始化FuzzerParam对象
+
+        :param projectTag: 项目标识符，用于数据库查询和文件路径定位
+        """
         self.projectTag = projectTag
         self.blacklist_param = readConfig.ReadConfig().getValue('FuzzerParam', 'param')[0]
         self.default_judges = readConfig.ReadConfig().getValue('FuzzerParam', 'default')[0]
         self.log = creatLog().get_logger()
 
     def collect_api_str(self):
+        """
+        收集API相关的字符串信息
+
+        遍历项目路径下的所有文件，查找与API相关的内容并分类存储POST和GET请求的信息。
+
+        :return: 包含POST和GET请求信息的列表
+        """
         whole_post_str = ""
         whole_get_str = ""
         projectPath = DatabaseType(self.projectTag).getPathfromDB()
@@ -83,6 +112,15 @@ class FuzzerParam():
         return whole_str
 
     def FuzzerCollect(self):
+        """
+        收集并处理模糊测试参数
+
+        主要功能包括：
+        1. 提取API参数
+        2. 生成默认值
+        3. 构建JSON格式的配置模板
+        4. 更新数据库中的api_tree表
+        """
         templates_post_str = """
         {
             "type": "post",
@@ -352,7 +390,15 @@ class FuzzerParam():
             sql = "UPDATE api_tree set option='%s' where id='%s'" % (option, api[0])
             cursor.execute(sql)
 
-    def result_method_1(self,str):
+    def result_method_1(self, str):
+        """
+        使用正则表达式提取API参数
+
+        从给定字符串中提取method、url和data字段中的键值对。
+
+        :param str: 待分析的字符串
+        :return: 包含参数名列表和参数值列表的二维列表
+        """
         result_key_list = []
         result_value_list = []
         regxs_1 = r'method\:.*?\,url\:.*?\,data\:({.*?})'
@@ -380,7 +426,15 @@ class FuzzerParam():
         result_list = [result_key_list,result_value_list]
         return result_list
 
-    def violent_method(self,str):
+    def violent_method(self, str):
+        """
+        暴力提取参数方法
+
+        通过正则表达式暴力匹配可能的参数名称，并过滤黑名单参数。
+
+        :param str: 待分析的字符串
+        :return: 包含合法参数名列表和对应默认值列表的二维列表
+        """
         violent_regx = r'(?isu)"([^"]+)'
         results = re.findall(violent_regx, str)
         result_key_list = []
@@ -400,3 +454,4 @@ class FuzzerParam():
             result_value_list.append(FuzzerParam(self.projectTag).creatAlpha(3))
         result_list = [result_key_list,result_value_list]
         return result_list
+
