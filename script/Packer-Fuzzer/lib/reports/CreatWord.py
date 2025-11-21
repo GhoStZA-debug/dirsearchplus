@@ -18,8 +18,20 @@ from lib.reports.creat_vuln_detail import Creat_vuln_detail
 
 
 class Docx_replace():
+    """
+    用于生成并替换 Word 报告模板中的占位符内容。
+
+    参数:
+        projectTag (str): 当前项目的唯一标识符，用于数据库查询和文件命名。
+    """
 
     def __init__(self,projectTag):
+        """
+        初始化 Docx_replace 类实例。
+
+        参数:
+            projectTag (str): 项目标签，用于确定报告语言、路径等。
+        """
         docLang = Utils().getMyWord("{lang}")
         self.projectTag = projectTag
         self.tmp_filepath = "doc" + os.sep + "template" + os.sep + docLang + ".docx"
@@ -27,6 +39,12 @@ class Docx_replace():
         self.log = creatLog().get_logger()
 
     def vuln_judge(self):
+        """
+        根据漏洞类型统计高、中、低风险漏洞数量，并计算总评分。
+
+        返回:
+            list[int]: 包含总评分、高危数、中危数、低危数的列表。
+        """
         vuln_judges = []
         vuln_h_num = [0,6]
         vuln_m_num = [0,2]
@@ -63,6 +81,15 @@ class Docx_replace():
 
 
     def docxReplace(self, document):
+        """
+        替换文档中的所有占位符内容，包括基本信息、漏洞详情、API 列表等内容。
+
+        参数:
+            document (Document): 要处理的 python-docx 文档对象。
+
+        返回:
+            Document: 处理完成后的文档对象。
+        """
         cmd = CommandLines().cmd()
         ipAddr = testProxy(cmd,0)
         end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -198,6 +225,7 @@ class Docx_replace():
         except Exception as e:
             self.log.error("[Err] %s" % e)
 
+        # 替换表格中的占位符
         for table in document.tables:
             for row in range(len(table.rows)):
                 for col in range(len(table.columns)):
@@ -205,12 +233,14 @@ class Docx_replace():
                         if key in table.cell(row, col).text:
                             table.cell(row, col).text = table.cell(row, col).text.replace(key, value)
 
+        # 替换段落中的普通占位符
         for para in document.paragraphs:
             for i in range(len(para.runs)):
                 for key, value in DICT.items():
                     if key in para.runs[i].text:
                         para.runs[i].text = para.runs[i].text.replace(key, value)
 
+        # 特殊格式化替换：JS 文件列表
         for para in document.paragraphs:
             for i in range(len(para.runs)):
                 if "{js_list}" in para.runs[i].text:
@@ -218,6 +248,7 @@ class Docx_replace():
                     para.runs[i].font.size = Pt(10)
                     para.runs[i].font.name = "Arial"
 
+        # 替换结束时间和安全等级
         for para in document.paragraphs:
             for i in range(len(para.runs)):
                 if "{end_time}" in para.runs[i].text:
@@ -237,6 +268,7 @@ class Docx_replace():
                     elif sec_lv == Utils().getMyWord("{risk_h}"):
                         para.runs[i].font.color.rgb = RGBColor(238, 0, 0)
 
+        # 插入动态生成的内容模块
         try:
             Creat_vuln_detail(self.projectTag).creat_detail(document)
             self.log.debug("正确获取vuln_detail替换内容")
@@ -262,12 +294,25 @@ class Docx_replace():
 
 
     def mainReplace(self):
+        """
+        加载模板文档并执行替换操作后保存到临时文件。
+        """
         document = Document(self.tmp_filepath)
         document = Docx_replace(self.projectTag).docxReplace(document)
         document.save(self.new_filepath)
 
     def docMove(self,nameDoc):
+        """
+        将生成好的报告复制到指定位置。
+
+        参数:
+            nameDoc (str): 目标文件名（包含完整路径）。
+        """
         shutil.copyfile(self.new_filepath, nameDoc)
 
     def docDel(self):
+        """
+        删除临时生成的报告文件。
+        """
         os.remove(self.new_filepath)
+
