@@ -7,8 +7,28 @@ from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
 
 
 class ApiText(object):
+    """
+    API文本检测类，用于并发检测多个URL的响应内容
+
+    Attributes:
+        log: 日志记录器实例
+        UserAgent: 用户代理字符串列表，用于模拟不同浏览器请求
+        codes: 状态码列表（未使用）
+        url: URL列表（未使用）
+        urls: 待检测的URL列表
+        res: 存储URL检测结果的字典
+        options: 配置选项对象
+        proxy_data: 代理配置字典
+    """
 
     def __init__(self, urls, options):
+        """
+        初始化ApiText实例
+
+        Args:
+            urls (list): 待检测的URL列表
+            options (object): 配置选项对象，包含proxy、contenttype、cookie、head、ssl_flag等属性
+        """
         self.log = creatLog().get_logger()
         self.UserAgent = ["Mozilla/5.0 (Windows NT 6.1; WOW64; rv:34.0) Gecko/20100101 Firefox/34.0",
                           "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; en) Opera 9.50",
@@ -33,11 +53,27 @@ class ApiText(object):
         self.proxy_data = {'http': self.options.proxy,'https': self.options.proxy}
 
     def check(self, url):
+        """
+        检测单个URL的响应内容
+
+        通过发送HTTP GET请求获取URL的响应文本内容，并将结果存储在实例变量res中。
+        支持自定义请求头、Cookie、代理和SSL验证设置。
+
+        Args:
+            url (str): 待检测的URL地址
+
+        Note:
+            异常处理：网络请求异常会被记录到日志中
+        """
         urllib3.disable_warnings()  # 禁止跳出来对warning
+
+        # 设置Content-Type请求头
         if self.options.contenttype != None:
             contenttype = self.options.contenttype
         else:
             contenttype = 'application/x-www-form-urlencoded'
+
+        # 根据是否提供Cookie设置请求头
         if self.options.cookie != None:
             headers = {
                 'User-Agent': random.choice(self.UserAgent),
@@ -53,21 +89,30 @@ class ApiText(object):
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 self.options.head.split(':')[0]: self.options.head.split(':')[1]
             }
+
         s = requests.Session()
         s.keep_alive = False
         sslFlag = int(self.options.ssl_flag)
+
         try:
+            # 根据SSL标志决定是否验证SSL证书
             if sslFlag == 1:
-                text = str(s.get(url, headers=headers, timeout=6, proxies=self.proxy_data, verify=False).text)  # 正常的返回code是int类型
+                text = str(s.get(url, headers=headers, timeout=6, proxies=self.proxy_data, verify=False).text)
             else:
                 text = str(s.get(url, headers=headers, timeout=6, proxies=self.proxy_data).text)
             self.res[url] = text
-            # else:
-            # self.res[url] = text
         except Exception as e:
             self.log.error("[Err] %s" % e)
 
     def run(self):
+        """
+        并发执行URL检测任务
+
+        使用线程池并发执行所有URL的检测任务，等待所有任务完成后返回检测结果。
+
+        Returns:
+            dict: 包含所有URL检测结果的字典，键为URL，值为响应文本
+        """
         # target = (url for url in self.urls)
         pool = ThreadPoolExecutor(20)
         allTask = [pool.submit(self.check, domain) for domain in self.urls]
@@ -85,3 +130,4 @@ class ApiText(object):
 #         che.run()
 #     except KeyboardInterrupt:
 #         print("停止中...")
+
