@@ -7,9 +7,32 @@ from lib.common.CreatLog import creatLog
 from concurrent.futures import ThreadPoolExecutor,ALL_COMPLETED,wait
 
 
-class WebRequest(object): # 获取http返回的状态码
+class WebRequest(object):
+    """
+    Web请求处理类，用于发送HTTP请求并获取响应信息
+
+    Attributes:
+        log: 日志记录器实例
+        UserAgent: 用户代理字符串列表
+        texts: 存储响应内容的列表
+        responses: 存储响应头信息的列表
+        mode: 请求模式（1-仅获取状态码，2-获取响应头，3-获取响应头和内容）
+        res: 存储响应头和内容的字典
+        codes: 存储URL和状态码映射的字典
+        urls: 待请求的URL列表
+        options: 配置选项对象
+        proxy_data: 代理配置字典
+    """
 
     def __init__(self, mode, urls,options):
+        """
+        初始化WebRequest对象
+
+        Args:
+            mode: 请求模式标识
+            urls: URL列表
+            options: 配置选项对象
+        """
         self.log = creatLog().get_logger()
         self.UserAgent = ["Mozilla/5.0 (Windows NT 6.1; WOW64; rv:34.0) Gecko/20100101 Firefox/34.0",
                           "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; en) Opera 9.50",
@@ -37,8 +60,22 @@ class WebRequest(object): # 获取http返回的状态码
         self.proxy_data = {'http': self.options.proxy,'https': self.options.proxy}
 
     def check(self, url, options):
+        """
+        发送HTTP请求并根据模式获取相应数据
+
+        Args:
+            url: 目标URL
+            options: 配置选项
+
+        Returns:
+            根据不同模式返回不同的数据：
+            - 模式2：返回响应头列表
+            - 模式3：返回响应头和内容的zip对象
+        """
         urllib3.disable_warnings()  # 禁止跳出来对warning
         sslFlag = int(self.options.ssl_flag)
+
+        # 构造请求头，支持自定义cookie和header
         if self.options.cookie != None:
             headers = {
                 'User-Agent': random.choice(self.UserAgent),
@@ -58,7 +95,9 @@ class WebRequest(object): # 获取http返回的状态码
 
         s = requests.Session()
         s.keep_alive = False
+
         try:
+            # 模式1：仅获取状态码
             if self.mode == 1:
                 try:
                     if sslFlag == 1:
@@ -70,6 +109,7 @@ class WebRequest(object): # 获取http返回的状态码
                 except Exception as e:
                     self.log.error("[Err] %s" % e)
 
+            # 模式2：获取响应头
             if self.mode == 2:
                 # 获取响应包
                 try:
@@ -83,7 +123,7 @@ class WebRequest(object): # 获取http返回的状态码
                     self.log.error("[Err] %s" % e)
 
 
-            # 获取响应包和内容
+            # 模式3：获取响应头和内容
             if self.mode == 3:
                 try:
                     if sslFlag == 1:
@@ -102,8 +142,12 @@ class WebRequest(object): # 获取http返回的状态码
         except Exception as e:
             self.log.error("[Err] %s" % e)
 
-    # 多线程获取状态码
     def forceBrute(self):
+        """
+        使用多线程并发执行HTTP请求
+
+        通过线程池并发处理多个URL请求，提高扫描效率
+        """
         pool = ThreadPoolExecutor(20)
         all_task = [pool.submit(self.check, domain) for domain in self.urls]
         wait(all_task, return_when=ALL_COMPLETED)
@@ -124,3 +168,4 @@ class WebRequest(object): # 获取http返回的状态码
         # pool = ThreadPoolExecutor(20)
         # [pool.submit(self.check,domain) for domain in self.urls]
         # time.sleep(1)
+
