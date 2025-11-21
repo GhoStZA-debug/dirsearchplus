@@ -2,13 +2,33 @@
 # -*- encoding: utf-8 -*-
 
 import urllib3,random,requests
-from lib.common.CreatLog import creatLog
+from .common.CreatLog import creatLog
 from concurrent.futures import ThreadPoolExecutor,wait, ALL_COMPLETED
 
 
 class PostApiText(object):
+    """
+    用于批量发送POST请求并获取响应结果的类
+
+    Attributes:
+        log: 日志记录器实例
+        UserAgent: 用户代理字符串列表，用于模拟不同浏览器
+        codes: 状态码列表（未使用）
+        url: URL列表（未使用）
+        urls: 待检测的URL列表
+        res: 存储URL及其响应内容的字典
+        options: 命令行参数配置对象
+        proxy_data: 代理配置字典
+    """
 
     def __init__(self, urls, options):
+        """
+        初始化PostApiText实例
+
+        Args:
+            urls (list): 需要检测的URL列表
+            options (object): 包含各种配置选项的对象，如proxy、contenttype、cookie等
+        """
         self.log = creatLog().get_logger()
         self.UserAgent = ["Mozilla/5.0 (Windows NT 6.1; WOW64; rv:34.0) Gecko/20100101 Firefox/34.0",
                           "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; en) Opera 9.50",
@@ -33,6 +53,21 @@ class PostApiText(object):
         self.proxy_data = {'http': self.options.proxy,'https': self.options.proxy}
 
     def check(self, url):
+        """
+        对单个URL发送POST请求并处理响应
+
+        主要功能包括：
+        1. 根据配置构建请求头和数据
+        2. 发送POST请求并获取响应
+        3. 处理特定状态码(415, 401)的重试机制
+        4. 支持多种Content-Type格式的自动切换
+
+        Args:
+            url (str): 需要检测的URL地址
+
+        Returns:
+            None: 结果直接存储在实例变量self.res中
+        """
         urllib3.disable_warnings()  # 禁止跳出来对warning
         if self.options.contenttype != None:
             contenttype = self.options.contenttype
@@ -150,6 +185,15 @@ class PostApiText(object):
             self.log.error("[Err] %s" % e)
 
     def run(self):
+        """
+        并发执行所有URL的检测任务
+
+        使用线程池并发处理多个URL的POST请求，
+        提高检测效率
+
+        Returns:
+            dict: 包含所有成功请求的URL及其响应内容的字典
+        """
         pool = ThreadPoolExecutor(20)
         allTask = [pool.submit(self.check, domain) for domain in self.urls]
         wait(allTask, return_when=ALL_COMPLETED)
@@ -162,3 +206,4 @@ class PostApiText(object):
 #         che.run()
 #     except KeyboardInterrupt:
 #         print("停止中...")
+
