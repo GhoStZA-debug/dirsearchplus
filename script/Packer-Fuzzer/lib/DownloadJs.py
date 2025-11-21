@@ -9,8 +9,19 @@ from lib.common.CreatLog import creatLog
 
 
 class DownloadJs():
+    """
+    JS文件下载处理类
+
+    用于处理JS文件的下载、过滤黑名单域名和文件名，并将相关信息存储到数据库中
+    """
 
     def __init__(self, jsRealPaths, options):
+        """
+        初始化DownloadJs类
+
+        :param jsRealPaths: JS文件的真实路径列表
+        :param options: 配置选项对象，包含代理、cookie等配置信息
+        """
         # 传入的js文件的路径
         warnings.filterwarnings('ignore')
         self.jsRealPaths = jsRealPaths
@@ -36,6 +47,12 @@ class DownloadJs():
         self.log = creatLog().get_logger()
 
     def jsBlacklist(self):
+        """
+        过滤JS文件路径中的黑名单域名和文件名
+
+        根据配置文件中的黑名单域名和文件名列表，过滤掉匹配的JS文件路径
+        :return: 过滤后的JS文件路径列表
+        """
         newList = self.jsRealPaths[:]  # 防止遍历不全
         for jsRealPath in newList:  # 遍历js路径
             res = urlparse(jsRealPath)
@@ -60,7 +77,15 @@ class DownloadJs():
                     self.jsRealPaths.remove(jsRealPath)
         return self.jsRealPaths
 
-    def downloadJs(self, tag, host, spiltId):  # 下载js文件
+    def downloadJs(self, tag, host, spiltId):
+        """
+        下载JS文件并存储到本地和数据库
+
+        :param tag: 标签标识符
+        :param host: 主机地址
+        :param spiltId: 分割ID，用于区分不同的分割部分
+        """
+        # 构造请求头信息
         if self.options.cookie != None:
             header = {
                 'User-Agent': random.choice(self.UserAgent),
@@ -82,6 +107,8 @@ class DownloadJs():
             self.log.debug("js黑名单函数正常")
         except Exception as e:
             self.log.error("[Err] %s" % e)
+
+        # 遍历JS文件路径并下载
         for jsRealPath in self.jsRealPaths:
             jsFilename = Utils().getFilename(jsRealPath)
             jsTag = Utils().creatTag(6)
@@ -90,14 +117,19 @@ class DownloadJs():
             cursor = conn.cursor()
             conn.isolation_level = None
             checkSql = "select * from js_file where name = '" + jsFilename + "'"
+
+            # 根据spiltId构造不同的SQL语句
             if spiltId == 0:
                 sql = "insert into js_file(name,path,local) values('%s','%s','%s')" % (
                     jsFilename, jsRealPath, jsTag + "." + jsFilename)
             else:
                 sql = "insert into js_file(name,path,local,spilt) values('%s','%s','%s',%d)" % (
                     jsFilename, jsRealPath, jsTag + "." + jsFilename, spiltId)
+
             cursor.execute(checkSql)
             res = cursor.fetchall()
+
+            # 检查文件是否已存在
             if len(res) > 0:
                 self.log.info(Utils().tellTime() + Utils().getMyWord("{have_it}") + jsFilename)
                 conn.close()
@@ -105,11 +137,15 @@ class DownloadJs():
                 cursor.execute(sql)
                 conn.commit()
                 self.log.info(Utils().tellTime() + Utils().getMyWord("{downloading}") + jsFilename)
+
+                # 根据SSL标志选择是否验证证书
                 sslFlag = int(self.options.ssl_flag)
                 if sslFlag == 1:
                     jsFileData = requests.get(url=jsRealPath, headers=header, proxies=self.proxy_data, verify=False).content
                 else:
                     jsFileData = requests.get(url=jsRealPath, proxies=self.proxy_data, headers=header).content
+
+                # 写入文件并更新数据库状态
                 with open("tmp" + os.sep + tag + "_" + host + os.sep + jsTag + "." + jsFilename, "wb") as js_file:
                     js_file.write(jsFileData)
                     js_file.close()
@@ -117,7 +153,15 @@ class DownloadJs():
                     conn.commit()
                 conn.close()
 
-    def creatInsideJs(self, tag, host, scriptInside, url):  # 生成html的script的文件
+    def creatInsideJs(self, tag, host, scriptInside, url):
+        """
+        创建内联JS文件（HTML中的script标签内容）
+
+        :param tag: 标签标识符
+        :param host: 主机地址
+        :param scriptInside: script标签内的内容
+        :param url: URL地址
+        """
         try:
             jsRealPath = url
             jsFilename = "7777777.script.inside.html.js" #随便来一个
@@ -131,6 +175,8 @@ class DownloadJs():
             cursor.execute(sql)
             conn.commit()
             self.log.info(Utils().tellTime() + Utils().getMyWord("{downloading}") + jsFilename)
+
+            # 将script内容写入文件并更新数据库
             with open("tmp" + os.sep + tag + "_" + host + os.sep + jsTag + "." + jsFilename, "wb") as js_file:
                 js_file.write(str.encode(scriptInside))
                 js_file.close()
@@ -139,3 +185,4 @@ class DownloadJs():
             conn.close()
         except Exception as e:
             self.log.error("[Err] %s" % e)
+
