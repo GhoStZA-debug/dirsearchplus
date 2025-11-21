@@ -1,21 +1,3 @@
-# -*- coding: utf-8 -*-
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
-#
-#  Author: Mauro Soria
-
 import os
 import sys
 import time
@@ -27,15 +9,34 @@ from lib.utils.common import human_size
 
 
 class HTMLReport(FileBaseReport):
+    """
+    HTML报告生成器类
+
+    该类继承自FileBaseReport，用于生成HTML格式的扫描结果报告
+    """
+
     def generate(self, entries):
+        """
+        生成HTML格式的报告
+
+        Args:
+            entries: 扫描结果条目列表，每个条目包含URL、状态码、内容长度等信息
+
+        Returns:
+            str: 渲染后的HTML报告字符串
+        """
+        # 配置Jinja2模板环境，加载报告模板
         file_loader = FileSystemLoader(
             os.path.dirname(os.path.realpath(__file__)) + "/templates/"
         )
         env = Environment(loader=file_loader)
         template = env.get_template("html_report_template.html")
+
+        # 准备报告元数据，包括命令行参数和生成时间
         metadata = {"command": " ".join(sys.argv), "date": time.ctime()}
         results = []
 
+        # 处理每个扫描结果条目，根据状态码设置相应的CSS样式类
         for entry in entries:
             status_color_class = ""
             if entry.status >= 200 and entry.status <= 299:
@@ -45,6 +46,7 @@ class HTMLReport(FileBaseReport):
             elif entry.status >= 400 and entry.status <= 599:
                 status_color_class = "text-danger"
 
+            # 将处理后的结果添加到结果列表中
             results.append(
                 {
                     "url": entry.url,
@@ -56,4 +58,6 @@ class HTMLReport(FileBaseReport):
                 }
             )
 
+        # 使用模板渲染最终的HTML报告
         return template.render(metadata=metadata, results=results)
+
